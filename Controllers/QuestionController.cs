@@ -9,7 +9,6 @@ using Residence.Entities;
 
 namespace Residence.Controllers;
 
-[Authorize(Roles = "User")]
 
 public class QuestionController : BaseApiController
 {
@@ -23,7 +22,8 @@ public class QuestionController : BaseApiController
     }
 
     [HttpPost]
-    public async Task<ActionResult<bool>> Post([FromBody] QuestionRequestDto questionRequest)
+    [Authorize(Roles = "User")]
+public async Task<ActionResult<bool>> Post([FromBody] QuestionRequestDto questionRequest)
     {
         var sqlconnectstring = _configuration.GetConnectionString("DefaultConnection");
         var connection = new MySqlConnection(sqlconnectstring);
@@ -51,7 +51,8 @@ public class QuestionController : BaseApiController
     }
 
     [HttpGet("questionnaire")]
-    public async Task<ActionResult<List<QuestionAnswerDto>>> GetQuestionnaire()
+    [Authorize(Roles = "User")]
+public async Task<ActionResult<List<QuestionAnswerDto>>> GetQuestionnaire()
     {
         var sqlconnectstring = _configuration.GetConnectionString("DefaultConnection");
         var connection = new MySqlConnection(sqlconnectstring);
@@ -75,6 +76,38 @@ public class QuestionController : BaseApiController
             }
         }
         await connection.CloseAsync();
+        return BadRequest();
+    }
+
+    [HttpGet("admin/questionnaire")]
+    [Authorize(Roles = "Administrator")]
+    public async Task<ActionResult<PaginationResponseDto<QuestionAnswerDto>>> GetQuestionnaireForAdmin([FromQuery] PaginationRequestDto request)
+    {
+        var sqlconnectstring = _configuration.GetConnectionString("DefaultConnection");
+        var connection = new MySqlConnection(sqlconnectstring);
+        await connection.OpenAsync();
+        if (connection.State == ConnectionState.Open)
+        {
+            var response = new PaginationResponseDto<QuestionAnswerDto>();
+            var count = await CountQuestionnaire(connection);
+            if (count == null || count == 0)
+            {
+                response.Data = new List<QuestionAnswerDto>();
+                response.Total = 0;
+                await connection.CloseAsync();
+                return Ok(response);
+            }
+            var list = await GetQuestionnaireForAdmin(connection, request);
+            if (list == null)
+            {
+                await connection.CloseAsync();
+                return BadRequest();
+            }
+            response.Data = list;
+            response.Total = (int)count;
+            await connection.CloseAsync();
+            return Ok(response);
+        }
         return BadRequest();
     }
 
@@ -188,6 +221,80 @@ public class QuestionController : BaseApiController
                     return list;
                 }
                 return null;
+            }
+
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+            return null;
+        }
+    }
+
+    private async Task<List<QuestionAnswerDto>?> GetQuestionnaireForAdmin(MySqlConnection connection, PaginationRequestDto request)
+    {
+        using var command = new MySqlCommand();
+        command.Connection = connection;
+
+        string queryString = @"SELECT cauhoi.IdCauHoi, cauhoi.CauHoi, cauhoi.UpdatedAt as CauHoiUpdatedAt, cautraloi.IdTraLoi, cautraloi.CauTraLoi, cautraloi.UpdatedAt as CauTraLoiUpdatedAt FROM cauhoi LEFT JOIN cautraloi ON cauhoi.IdCauHoi = cautraloi.IdCauHoi ORDER BY cauhoi.IdCauHoi DESC LIMIT @Limit OFFSET @Offset;";
+
+        command.CommandText = queryString;
+        command.Parameters.AddWithValue("@Limit", request.PageSize);
+        command.Parameters.AddWithValue("@Offset", request.PageSize * (request.PageNumber - 1));
+        try
+        {
+            using (DbDataReader reader = await command.ExecuteReaderAsync())
+            {
+                if (reader.HasRows)
+                {
+                    var list = new List<QuestionAnswerDto>();
+                    while (reader.Read())
+                    {
+                        var questionAnswer = new QuestionAnswerDto
+                        {
+                            IdCauHoi = reader.GetInt32("IdCauHoi"),
+                            IdTraLoi = reader["IdTraLoi"] != DBNull.Value ? reader.GetInt32("IdTraLoi") : null,
+                            CauHoi = reader.GetString("CauHoi"),
+                            CauTraLoi = reader["CauTraLoi"] != DBNull.Value ? reader.GetString("CauTraLoi") : null,
+                            CauHoiUpdatedAt = (DateTime)reader["CauHoiUpdatedAt"],
+                            CauTraLoiUpdatedAt = reader["CauTraLoiUpdatedAt"] != DBNull.Value ? (DateTime)reader["CauTraLoiUpdatedAt"] : null,
+                        };
+                        list.Add(questionAnswer);
+                    }
+                    return list;
+                }
+                return null;
+            }
+
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+            return null;
+        }
+    }
+
+    private async Task<int?> CountQuestionnaire(MySqlConnection connection)
+    {
+        using var command = new MySqlCommand();
+        command.Connection = connection;
+
+        string queryString = @"SELECT COUNT(IdCauHoi) as NumberOfQuestions FROM cauhoi;";
+
+        command.CommandText = queryString;
+        try
+        {
+            using (DbDataReader reader = await command.ExecuteReaderAsync())
+            {
+                if (reader.HasRows)
+                {
+                    while (reader.Read())
+                    {
+                        var count = reader.GetInt32("NumberOfQuestions");
+                        return count;
+                    }
+                }
+                return 0;
             }
 
         }
