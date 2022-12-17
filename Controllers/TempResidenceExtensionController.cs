@@ -187,7 +187,7 @@ public class TempResidenceExtensionController : BaseApiController
         using var command = new MySqlCommand();
         command.Connection = connection;
 
-        string queryString = @"SELECT * FROM dangkitamtru WHERE IdUsers = @IdUsers;";
+        string queryString = @"SELECT * FROM dangkytamtru WHERE IdUsers = @IdUsers;";
 
         command.CommandText = queryString;
         command.Parameters.AddWithValue("@IdUsers", IdUsers);
@@ -231,7 +231,7 @@ public class TempResidenceExtensionController : BaseApiController
         using var command = new MySqlCommand();
         command.Connection = connection;
 
-        string queryString = @"UPDATE dangkitamtru SET ThanhPho=@ThanhPho, Quan=@Quan, Phuong=@Phuong, DiaChi=@DiaChi, TamTruTuNgay=@TamTruTuNgay, TamTruDenNgay=@TamTruDenNgay WHERE IdHoSoDkiTamtru=@Id;";
+        string queryString = @"UPDATE dangkytamtru SET ThanhPho=@ThanhPho, Quan=@Quan, Phuong=@Phuong, DiaChi=@DiaChi, TamTruTuNgay=@TamTruTuNgay, TamTruDenNgay=@TamTruDenNgay WHERE IdHoSoDkiTamtru=@Id;";
 
         command.CommandText = queryString;
         command.Parameters.AddWithValue("@ThanhPho", tempResidenceExtension.TamTruThanhPho);

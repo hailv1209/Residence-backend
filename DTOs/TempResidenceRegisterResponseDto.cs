@@ -1,7 +1,9 @@
 namespace Residence.DTOs;
 
-public class TempResidenceRegisterDto
+public class TempResidenceRegisterResponseDto
 {
+    public int IdHoSoDkiTamtru { get; set; }
+    public int IdUsers { get; set; }
     public string? ThuTuc { get; set; }
     public string? ThanhPho { get; set; }
     public string? Quan { get; set; }

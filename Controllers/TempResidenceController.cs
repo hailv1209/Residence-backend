@@ -1,9 +1,13 @@
 using System.Data;
+using System.Data.Common;
+using System.Security.Claims;
+using FluentEmail.Core;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MySql.Data.MySqlClient;
 using Residence.DTOs;
 using Residence.Entities;
+using Residence.Services;
 
 namespace Residence.Controllers;
 
@@ -11,11 +15,13 @@ public class TempResidenceController : BaseApiController
 {
     private readonly ILogger<TempResidenceController> _logger;
     private readonly IConfiguration _configuration;
+    private readonly EmailService<dynamic> _email;
 
-    public TempResidenceController(ILogger<TempResidenceController> logger, IConfiguration configuration)
+    public TempResidenceController(ILogger<TempResidenceController> logger, IConfiguration configuration, IFluentEmail email)
     {
         _configuration = configuration;
         _logger = logger;
+        _email = new EmailService<dynamic>(email);
     }
     [Authorize(Roles = "User")]
     [HttpPost]
@@ -26,9 +32,17 @@ public class TempResidenceController : BaseApiController
         await connection.OpenAsync();
         if (connection.State == ConnectionState.Open)
         {
+            var username = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var userFromDB = await GetUser(connection, username);
+
+            if (userFromDB == null)
+            {
+                await connection.CloseAsync();
+                return NotFound("User not found");
+            }
             var newTempResidenceRegister = new TempResidenceRegister
             {
-                IdUsers = tempResidenceRegisterDto.IdUsers,
+                IdUsers = userFromDB.IdUsers,
                 ThuTuc = tempResidenceRegisterDto.ThuTuc,
                 ThanhPho = tempResidenceRegisterDto.ThanhPho,
                 Quan = tempResidenceRegisterDto.Quan,
@@ -89,6 +103,8 @@ public class TempResidenceController : BaseApiController
             var result = await UpdateTempResidenceRegisterStatus(connection, tempResidenceRegister);
             if (result)
             {
+                var emailTemplate = new EmailDto<dynamic>{};
+                await _email.SendEmail(emailTemplate);
                 await connection.CloseAsync();
                 return Ok(true);
             }
@@ -99,13 +115,90 @@ public class TempResidenceController : BaseApiController
         return BadRequest();
     }
 
+    [Authorize(Roles = "Administrator")]
+    [HttpGet("admin")]
+    public async Task<ActionResult> GetForAdmin([FromQuery] PaginationRequestDto request)
+    {
+        var sqlconnectstring = _configuration.GetConnectionString("DefaultConnection");
+        var connection = new MySqlConnection(sqlconnectstring);
+        await connection.OpenAsync();
+        if (connection.State == ConnectionState.Open)
+        {
+            var response = new PaginationResponseDto<TempResidenceRegisterResponseDto>();
+            var count = await CountListTempResidenceRegister(connection);
+            if (count == null || count == 0)
+            {
+                response.Data = new List<TempResidenceRegisterResponseDto>();
+                response.Total = 0;
+                await connection.CloseAsync();
+                return Ok(response);
+            }
+            var list = await GetListTempResidenceRegister(connection, request);
+            if (list == null)
+            {
+                await connection.CloseAsync();
+                return BadRequest();
+            }
+            response.Data = list;
+            response.Total = (int)count;
+            await connection.CloseAsync();
+            return Ok(response);
+        }
+        return BadRequest();
+    }
+
+     private async Task<User?> GetUser(MySqlConnection connection, string username)
+    {
+        using var command = new MySqlCommand();
+        command.Connection = connection;
+
+        string queryString = @"SELECT * FROM users WHERE Username = @username;";
+
+        command.CommandText = queryString;
+        command.Parameters.AddWithValue("@username", username);
+        try
+        {
+            using (DbDataReader reader = await command.ExecuteReaderAsync())
+            {
+                if (reader.HasRows)
+                {
+                    while (reader.Read())
+                    {
+                        var user = new User
+                        {
+                            IdUsers = reader.GetInt32("IdUsers"),
+                            Gender = reader.GetString("Gender"),
+                            Fullname = reader.GetString("Fullname"),
+                            Birthday = (DateTime)reader["Birthday"],
+                            City = reader.GetString("City"),
+                            District = reader.GetString("District"),
+                            Ward = reader.GetString("Ward"),
+                            Email = reader.GetString("Email"),
+                            Phone = reader.GetString("Phone"),
+                            Address = reader.GetString("Address"),
+                        };
+                        return user;
+                    }
+                    return null;
+                }
+                return null;
+            }
+
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+            return null;
+        }
+    }
+
     private async Task<bool> CreateTempResidenceRegister(MySqlConnection connection, TempResidenceRegister tempResidenceRegister)
     {
         var rows_affected = 0;
         using var command = new MySqlCommand();
         command.Connection = connection;
 
-        string queryString = @"INSERT INTO dangkitamtru (IdUsers, ThuTuc, ThanhPho, Quan, Phuong, DiaChi, HoTenChuHo, QuanHeVoiChuHo, CMNDChuHo, NoiDung, TamTruTuNgay, TamTruDenNgay, IDToKhai, TrangThai) VALUES (@IdUsers, @ThuTuc, @ThanhPho, @Quan, @Phuong, @DiaChi, @HoTenChuHo, @QuanHeVoiChuHo, @CMNDChuHo, @NoiDung, @TamTruTuNgay, @TamTruDenNgay, @IDToKhai, @TrangThai);
+        string queryString = @"INSERT INTO dangkytamtru (IdUsers, ThuTuc, ThanhPho, Quan, Phuong, DiaChi, HoTenChuHo, QuanHeVoiChuHo, CMNDChuHo, NoiDung, TamTruTuNgay, TamTruDenNgay, IDToKhai, TrangThai) VALUES (@IdUsers, @ThuTuc, @ThanhPho, @Quan, @Phuong, @DiaChi, @HoTenChuHo, @QuanHeVoiChuHo, @CMNDChuHo, @NoiDung, @TamTruTuNgay, @TamTruDenNgay, @IDToKhai, @TrangThai);
                                 select last_insert_id();";
 
         command.CommandText = queryString;
@@ -148,7 +241,7 @@ public class TempResidenceController : BaseApiController
         using var command = new MySqlCommand();
         command.Connection = connection;
 
-        string queryString = @"UPDATE dangkitamtru SET ThanhPho=@ThanhPho, Quan=@Quan, Phuong=@Phuong, DiaChi=@DiaChi, TamTruTuNgay=@TamTruTuNgay, TamTruDenNgay=@TamTruDenNgay WHERE IdHoSoDkiTamtru=@Id;";
+        string queryString = @"UPDATE dangkytamtru SET ThanhPho=@ThanhPho, Quan=@Quan, Phuong=@Phuong, DiaChi=@DiaChi, TamTruTuNgay=@TamTruTuNgay, TamTruDenNgay=@TamTruDenNgay WHERE IdHoSoDkiTamtru=@Id;";
 
         command.CommandText = queryString;
         command.Parameters.AddWithValue("@ThanhPho", tempResidenceRegister.TamTruThanhPho);
@@ -183,7 +276,7 @@ public class TempResidenceController : BaseApiController
         using var command = new MySqlCommand();
         command.Connection = connection;
 
-        string queryString = @"UPDATE dangkitamtru SET TrangThai=@TrangThai WHERE IdHoSoDkiTamtru=@Id;";
+        string queryString = @"UPDATE dangkytamtru SET TrangThai=@TrangThai WHERE IdHoSoDkiTamtru=@Id;";
 
         command.CommandText = queryString;
         command.Parameters.AddWithValue("@TrangThai", tempResidenceRegister.TrangThai);
@@ -204,6 +297,89 @@ public class TempResidenceController : BaseApiController
         {
             Console.WriteLine(e);
             return false;
+        }
+    }
+
+    private async Task<List<TempResidenceRegisterResponseDto>?> GetListTempResidenceRegister(MySqlConnection connection, PaginationRequestDto request)
+    {
+        using var command = new MySqlCommand();
+        command.Connection = connection;
+
+        string queryString = @"SELECT * FROM dangkytamtru ORDER BY IdHoSoDkiTamtru DESC LIMIT @Limit OFFSET @Offset;";
+
+        command.CommandText = queryString;
+        command.Parameters.AddWithValue("@Limit", request.PageSize);
+        command.Parameters.AddWithValue("@Offset", request.PageSize * (request.PageNumber - 1));
+        var response = new List<TempResidenceRegisterResponseDto>();
+        try
+        {
+            using (DbDataReader reader = await command.ExecuteReaderAsync())
+            {
+                if (reader.HasRows)
+                {
+                    while (reader.Read())
+                    {
+                        var table = new TempResidenceRegisterResponseDto
+                        {
+                            IdHoSoDkiTamtru= reader.GetInt32("IdHoSoDkiTamtru"),
+                            IdUsers = reader.GetInt32("IdUsers"),
+                            ThuTuc = reader.GetString("ThuTuc"),
+                            ThanhPho = reader.GetString("ThanhPho"),
+                            Quan = reader.GetString("Quan"),
+                            Phuong = reader.GetString("Phuong"),
+                            DiaChi = reader.GetString("DiaChi"),
+                            HoTenChuHo = reader.GetString("HoTenChuHo"),
+                            QuanHeVoiChuHo = reader.GetString("QuanHeVoiChuHo"),
+                            CMNDChuHo = reader.GetString("CMNDChuHo"),
+                            NoiDung = reader.GetString("NoiDung"),
+                            TamTruTuNgay = reader.GetDateTime("TamTruTuNgay"),
+                            TamTruDenNgay = reader.GetDateTime("TamTruDenNgay"),
+                            TrangThai = reader.GetString("TrangThai"),
+                            IdToKhai = reader.GetInt32("IdToKhai"),
+                        };
+                        response.Add(table);
+                    }
+                    return response;
+                }
+                return response;
+            }
+
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+            return null;
+        }
+    }
+
+    private async Task<int?> CountListTempResidenceRegister(MySqlConnection connection)
+    {
+        using var command = new MySqlCommand();
+        command.Connection = connection;
+
+        string queryString = @"SELECT COUNT(IdHoSoDkiTamtru	) as NumberOfTempResidenceRegister FROM dangkytamtru;";
+
+        command.CommandText = queryString;
+        try
+        {
+            using (DbDataReader reader = await command.ExecuteReaderAsync())
+            {
+                if (reader.HasRows)
+                {
+                    while (reader.Read())
+                    {
+                        var count = reader.GetInt32("NumberOfTempResidenceRegister");
+                        return count;
+                    }
+                }
+                return 0;
+            }
+
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+            return null;
         }
     }
 
