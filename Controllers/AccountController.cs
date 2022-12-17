@@ -56,7 +56,7 @@ public class AccountController : BaseApiController
     }
 
     [HttpPost("register")]
-    public async Task<ActionResult<bool>> Register(RegisterDto request)
+    public async Task<ActionResult<UserDto>> Register(RegisterDto request)
     {
         var sqlconnectstring = _configuration.GetConnectionString("DefaultConnection");
         var connection = new MySqlConnection(sqlconnectstring);
@@ -92,8 +92,19 @@ public class AccountController : BaseApiController
             var result = await CreateUser(connection, newUser);
             if (result)
             {
+                var createdUser = await GetUser(connection, request.Username!);
+                if (createdUser == null)
+                {
+                    return BadRequest();
+                }
                 await connection.CloseAsync();
-                return Ok(true);
+                var userToReturn = new UserDto
+                {
+                    Fullname = createdUser.Fullname,
+                    Username = createdUser.Username,
+                    Token = _service.GetToken(createdUser)
+                };
+                return Ok(userToReturn);
             }
             await connection.CloseAsync();
             return BadRequest();
@@ -125,8 +136,8 @@ public class AccountController : BaseApiController
                             IdUsers = reader.GetInt32("IdUsers"),
                             Username = reader.GetString("Username"),
                             Fullname = reader.GetString("Fullname"),
-                            PasswordHash = (byte[]) reader["PasswordHash"],
-                            PasswordSalt = (byte[]) reader["PasswordSalt"],
+                            PasswordHash = (byte[])reader["PasswordHash"],
+                            PasswordSalt = (byte[])reader["PasswordSalt"],
                         };
                         return user;
                     }
@@ -146,41 +157,41 @@ public class AccountController : BaseApiController
     private async Task<bool> CreateUser(MySqlConnection connection, User user)
     {
         var rows_affected = 0;
-            using var command = new MySqlCommand();
-            command.Connection = connection;
+        using var command = new MySqlCommand();
+        command.Connection = connection;
 
-            string queryString = @"INSERT INTO users (Username, Fullname, Gender, Birthday, City, District, Ward, Email, Phone, Address, PasswordHash, PasswordSalt) VALUES (@Username, @Fullname, @Gender, @Birthday, @City, @District, @Ward, @Email, @Phone, @Address, @PasswordHash, @PasswordSalt);
+        string queryString = @"INSERT INTO users (Username, Fullname, Gender, Birthday, City, District, Ward, Email, Phone, Address, PasswordHash, PasswordSalt) VALUES (@Username, @Fullname, @Gender, @Birthday, @City, @District, @Ward, @Email, @Phone, @Address, @PasswordHash, @PasswordSalt);
                                 select last_insert_id();";
 
-            command.CommandText = queryString;
-            command.Parameters.AddWithValue("@Username", user.Username);
-            command.Parameters.AddWithValue("@Fullname", user.Fullname);
-            command.Parameters.AddWithValue("@Gender", user.Gender);
-            command.Parameters.AddWithValue("@Birthday", user.Birthday);
-            command.Parameters.AddWithValue("@City", user.City);
-            command.Parameters.AddWithValue("@District", user.District);
-            command.Parameters.AddWithValue("@Ward", user.Ward);
-            command.Parameters.AddWithValue("@Email", user.Email);
-            command.Parameters.AddWithValue("@Phone", user.Phone);
-            command.Parameters.AddWithValue("@Address", user.Address);
-            command.Parameters.AddWithValue("@PasswordHash", user.PasswordHash);
-            command.Parameters.AddWithValue("@PasswordSalt", user.PasswordSalt);
+        command.CommandText = queryString;
+        command.Parameters.AddWithValue("@Username", user.Username);
+        command.Parameters.AddWithValue("@Fullname", user.Fullname);
+        command.Parameters.AddWithValue("@Gender", user.Gender);
+        command.Parameters.AddWithValue("@Birthday", user.Birthday);
+        command.Parameters.AddWithValue("@City", user.City);
+        command.Parameters.AddWithValue("@District", user.District);
+        command.Parameters.AddWithValue("@Ward", user.Ward);
+        command.Parameters.AddWithValue("@Email", user.Email);
+        command.Parameters.AddWithValue("@Phone", user.Phone);
+        command.Parameters.AddWithValue("@Address", user.Address);
+        command.Parameters.AddWithValue("@PasswordHash", user.PasswordHash);
+        command.Parameters.AddWithValue("@PasswordSalt", user.PasswordSalt);
 
-            try
+        try
+        {
+            rows_affected = await command.ExecuteNonQueryAsync();
+            if (rows_affected > 0)
             {
-                rows_affected = await command.ExecuteNonQueryAsync();
-                if (rows_affected > 0)
-                {
-                    
-                    return true;
-                }
-                return false;
 
+                return true;
             }
-            catch (Exception e)
-            {
-                Console.WriteLine(e);
-                return false;
-            }
+            return false;
+
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+            return false;
+        }
     }
 }
