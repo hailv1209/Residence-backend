@@ -18,5 +18,8 @@ public class TempResidenceExtensionResponseDto
     public string? TamTruDiaChi { get; set; }
     public DateTime? TamTruTuNgay { get; set; }
     public DateTime? TamTruDenNgay { get; set; }
+    public string? TamTruHoTenChuHo { get; set; }
+    public string? TamTruQuanHeVoiChuHo { get; set; }
+    public string? TamTruCMNDChuHo { get; set; }
 
 }

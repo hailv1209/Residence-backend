@@ -48,6 +48,7 @@ public class TempResidenceExtensionController : BaseApiController
 
             var result = new TempResidenceExtensionResponseDto
             {
+                IdHoSoDkiTamtru = residenceRegister.IdHoSoDkiTamtru,
                 Gender = userFromDB.Gender,
                 Fullname = userFromDB.Fullname,
                 Birthday = userFromDB.Birthday,
@@ -63,7 +64,9 @@ public class TempResidenceExtensionController : BaseApiController
                 TamTruDiaChi = residenceRegister.DiaChi,
                 TamTruTuNgay = residenceRegister.TamTruTuNgay,
                 TamTruDenNgay = residenceRegister.TamTruDenNgay,
-
+                TamTruCMNDChuHo = residenceRegister.CMNDChuHo,
+                TamTruHoTenChuHo = residenceRegister.HoTenChuHo,
+                TamTruQuanHeVoiChuHo = residenceRegister.QuanHeVoiChuHo
             };
 
             return result;
@@ -209,6 +212,10 @@ public class TempResidenceExtensionController : BaseApiController
                             DiaChi = reader.GetString("DiaChi"),
                             TamTruTuNgay = (DateTime)reader["TamTruTuNgay"],
                             TamTruDenNgay = (DateTime)reader["TamTruDenNgay"],
+                            HoTenChuHo = reader.GetString("HoTenChuHo"),
+                            QuanHeVoiChuHo = reader.GetString("QuanHeVoiChuHo"),
+                            CMNDChuHo = reader.GetString("CMNDChuHo"),
+
                         };
                         return tempResidenceRegister;
                     }
