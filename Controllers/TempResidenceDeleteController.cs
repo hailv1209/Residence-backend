@@ -207,7 +207,7 @@ public class TempResidenceDeleteController : BaseApiController
                     {
                         var table = new TempResidenceRegisterResponseDto
                         {
-                            IdHoSoDkiTamtru= reader.GetInt32("IdHoSoDkiTamtru"),
+                            IdHoSoDkiTamtru= reader.GetInt32("IdHoSoDangKyTamTru"),
                             IdUsers = reader.GetInt32("IdUsers"),
                             ThuTuc = reader.GetString("ThuTuc"),
                             ThanhPho = reader.GetString("ThanhPho"),
