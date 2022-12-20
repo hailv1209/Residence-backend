@@ -59,8 +59,8 @@ public class ResidenceInformationController : BaseApiController
         return BadRequest();
     }
 
-    [HttpPost]
-    public async Task<ActionResult<bool>> Post(ResidenceInformationRequestDto residenceInformation)
+    [HttpPatch]
+    public async Task<ActionResult<bool>> Patch(ResidenceInformationRequestDto residenceInformation)
     {
         var sqlconnectstring = _configuration.GetConnectionString("DefaultConnection");
         var connection = new MySqlConnection(sqlconnectstring);
@@ -84,13 +84,13 @@ public class ResidenceInformationController : BaseApiController
                 return BadRequest();
             }
 
-            var residenceInformationResult = await CreateResidenceInformation(connection, userFromDB.IdUsers, residenceInformation);
+            // var residenceInformationResult = await CreateResidenceInformation(connection, userFromDB.IdUsers, residenceInformation);
 
-            if (!residenceInformationResult)
-            {
-                await connection.CloseAsync();
-                return BadRequest();
-            }
+            // if (!residenceInformationResult)
+            // {
+            //     await connection.CloseAsync();
+            //     return BadRequest();
+            // }
 
             await connection.CloseAsync();
             return Ok(true);
@@ -183,35 +183,35 @@ public class ResidenceInformationController : BaseApiController
         }
     }
 
-    private async Task<bool> CreateResidenceInformation(MySqlConnection connection, int IdUsers, ResidenceInformationRequestDto residenceInformation)
-    {
-        var rows_affected = 0;
-        using var command = new MySqlCommand();
-        command.Connection = connection;
+    // private async Task<bool> CreateResidenceInformation(MySqlConnection connection, int IdUsers, ResidenceInformationRequestDto residenceInformation)
+    // {
+    //     var rows_affected = 0;
+    //     using var command = new MySqlCommand();
+    //     command.Connection = connection;
 
-        string queryString = @"INSERT INTO thongtincutru (IdUsers, IDToKhai, TrangThai) VALUES (@IdUsers, @IDToKhai, @TrangThai);
-                                select last_insert_id();";
+    //     string queryString = @"INSERT INTO thongtincutru (IdUsers, IDToKhai, TrangThai) VALUES (@IdUsers, @IDToKhai, @TrangThai);
+    //                             select last_insert_id();";
 
-        command.CommandText = queryString;
-        command.Parameters.AddWithValue("@IdUsers", IdUsers);
-        command.Parameters.AddWithValue("@IdToKhai", residenceInformation.IDToKhai);
-        command.Parameters.AddWithValue("@TrangThai", residenceInformation.TrangThai);
+    //     command.CommandText = queryString;
+    //     command.Parameters.AddWithValue("@IdUsers", IdUsers);
+    //     command.Parameters.AddWithValue("@IdToKhai", residenceInformation.IDToKhai);
+    //     command.Parameters.AddWithValue("@TrangThai", residenceInformation.TrangThai);
 
-        try
-        {
-            rows_affected = await command.ExecuteNonQueryAsync();
-            if (rows_affected > 0)
-            {
+    //     try
+    //     {
+    //         rows_affected = await command.ExecuteNonQueryAsync();
+    //         if (rows_affected > 0)
+    //         {
 
-                return true;
-            }
-            return false;
+    //             return true;
+    //         }
+    //         return false;
 
-        }
-        catch (Exception e)
-        {
-            Console.WriteLine(e);
-            return false;
-        }
-    }
+    //     }
+    //     catch (Exception e)
+    //     {
+    //         Console.WriteLine(e);
+    //         return false;
+    //     }
+    // }
 }
