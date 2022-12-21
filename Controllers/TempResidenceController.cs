@@ -1,6 +1,7 @@
 using System.Data;
 using System.Data.Common;
 using System.Security.Claims;
+using System.Text.Json;
 using FluentEmail.Core;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -8,6 +9,7 @@ using MySql.Data.MySqlClient;
 using Residence.DTOs;
 using Residence.Entities;
 using Residence.Services;
+using RestSharp;
 
 namespace Residence.Controllers;
 
@@ -16,12 +18,14 @@ public class TempResidenceController : BaseApiController
     private readonly ILogger<TempResidenceController> _logger;
     private readonly IConfiguration _configuration;
     private readonly EmailService<dynamic> _email;
+    private List<Province>? provinces;
 
     public TempResidenceController(ILogger<TempResidenceController> logger, IConfiguration configuration, IFluentEmail email)
     {
         _configuration = configuration;
         _logger = logger;
         _email = new EmailService<dynamic>(email);
+        provinces = null;
     }
     [Authorize(Roles = "User")]
     [HttpPost]
@@ -392,6 +396,7 @@ public class TempResidenceController : BaseApiController
         command.Parameters.AddWithValue("@Limit", request.PageSize);
         command.Parameters.AddWithValue("@Offset", request.PageSize * (request.PageNumber - 1));
         var response = new List<TempResidenceRegisterResponseDto>();
+        this.provinces = await GetProvinces();
         try
         {
             using (DbDataReader reader = await command.ExecuteReaderAsync())
@@ -405,9 +410,9 @@ public class TempResidenceController : BaseApiController
                             IdHoSoDkiTamtru= reader.GetInt32("IdHoSoDkiTamtru"),
                             IdUsers = reader.GetInt32("IdUsers"),
                             ThuTuc = reader.GetString("ThuTuc"),
-                            ThanhPho = reader.GetString("ThanhPho"),
-                            Quan = reader.GetString("Quan"),
-                            Phuong = reader.GetString("Phuong"),
+                            ThanhPho = this.provinces.FirstOrDefault(province => province.Code!.ToString() == reader.GetString("ThanhPho"))!.Name,
+                            Quan = await GetDistrict(reader.GetString("Quan")) ,
+                            Phuong = await GetWard(reader.GetString("Phuong")),
                             DiaChi = reader.GetString("DiaChi"),
                             HoTenChuHo = reader.GetString("HoTenChuHo"),
                             QuanHeVoiChuHo = reader.GetString("QuanHeVoiChuHo"),
@@ -659,6 +664,33 @@ public class TempResidenceController : BaseApiController
             Console.WriteLine(e);
             return null;
         }
+    }
+
+    private async Task<List<Province>> GetProvinces()
+    {
+        var client = new RestClient("https://provinces.open-api.vn/api/p/");
+        var request = new RestRequest("", Method.Get);
+        var response = await client.ExecuteAsync(request);
+        var result = JsonSerializer.Deserialize<List<Province>>(response.Content!);
+        return result!;
+    }
+
+    private async Task<string> GetDistrict(string districtCode)
+    {
+        var client = new RestClient($"https://provinces.open-api.vn/api/d/{districtCode}");
+        var request = new RestRequest("", Method.Get);
+        var response = await client.ExecuteAsync(request);
+        var result = JsonSerializer.Deserialize<District>(response.Content!);
+        return result!.Name!;
+    }
+
+    private async Task<string> GetWard(string wardCode)
+    {
+        var client = new RestClient($"https://provinces.open-api.vn/api/w/{wardCode}");
+        var request = new RestRequest("", Method.Get);
+        var response = await client.ExecuteAsync(request);
+        var result = JsonSerializer.Deserialize<Ward>(response.Content!);
+        return result!.Name!;
     }
 
 

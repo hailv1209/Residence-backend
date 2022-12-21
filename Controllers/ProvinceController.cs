@@ -29,7 +29,7 @@ public class ProvinceController : BaseApiController
         var client = new RestClient("https://provinces.open-api.vn/api/p/");
         var request = new RestRequest("", Method.Get);
         var response = await client.ExecuteAsync(request);
-        var result = JsonSerializer.Deserialize<dynamic>(response.Content!);
+        var result = JsonSerializer.Deserialize<IEnumerable<Province>>(response.Content!);
         return Ok(result);
     }
 
@@ -39,7 +39,7 @@ public class ProvinceController : BaseApiController
         var client = new RestClient($"https://provinces.open-api.vn/api/p/{code}?depth=2");
         var request = new RestRequest("", Method.Get);
         var response = await client.ExecuteAsync(request);
-        var result = JsonSerializer.Deserialize<dynamic>(response.Content!);
+        var result = JsonSerializer.Deserialize<Province>(response.Content!);
         return Ok(result);
     }
 
@@ -49,7 +49,7 @@ public class ProvinceController : BaseApiController
         var client = new RestClient($"https://provinces.open-api.vn/api/d/{code}?depth=2");
         var request = new RestRequest("", Method.Get);
         var response = await client.ExecuteAsync(request);
-        var result = JsonSerializer.Deserialize<dynamic>(response.Content!);
+        var result = JsonSerializer.Deserialize<District>(response.Content!);
         return Ok(result);
     }
 
