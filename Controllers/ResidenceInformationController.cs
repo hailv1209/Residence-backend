@@ -1,11 +1,13 @@
 using System.Data;
 using System.Data.Common;
 using System.Security.Claims;
+using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MySql.Data.MySqlClient;
 using Residence.DTOs;
 using Residence.Entities;
+using RestSharp;
 
 namespace Residence.Controllers;
 
@@ -145,6 +147,7 @@ public class ResidenceInformationController : BaseApiController
         command.CommandText = queryString;
         command.Parameters.AddWithValue("@Limit", request.PageSize);
         command.Parameters.AddWithValue("@Offset", request.PageSize * (request.PageNumber - 1));
+        var provinces = await GetProvinces();
         var response = new List<ResidenceInformationAdminRequestDto>();
         try
         {
@@ -160,9 +163,9 @@ public class ResidenceInformationController : BaseApiController
                             Gender = reader.GetString("Gender"),
                             Fullname = reader.GetString("Fullname"),
                             Birthday = (DateTime)reader["Birthday"],
-                            City = reader.GetString("City"),
-                            District = reader.GetString("District"),
-                            Ward = reader.GetString("Ward"),
+                            City = provinces.FirstOrDefault(province => province.Code!.ToString() == reader.GetString("City"))!.Name,
+                            District = await GetDistrict(reader.GetString("District")),
+                            Ward = await GetWard(reader.GetString("Ward")),
                             Email = reader.GetString("Email"),
                             Phone = reader.GetString("Phone"),
                             Address = reader.GetString("Address"),
@@ -293,6 +296,33 @@ public class ResidenceInformationController : BaseApiController
             Console.WriteLine(e);
             return false;
         }
+    }
+
+    private async Task<List<Province>> GetProvinces()
+    {
+        var client = new RestClient("https://provinces.open-api.vn/api/p/");
+        var request = new RestRequest("", Method.Get);
+        var response = await client.ExecuteAsync(request);
+        var result = JsonSerializer.Deserialize<List<Province>>(response.Content!);
+        return result!;
+    }
+
+    private async Task<string> GetDistrict(string districtCode)
+    {
+        var client = new RestClient($"https://provinces.open-api.vn/api/d/{districtCode}");
+        var request = new RestRequest("", Method.Get);
+        var response = await client.ExecuteAsync(request);
+        var result = JsonSerializer.Deserialize<District>(response.Content!);
+        return result!.Name!;
+    }
+
+    private async Task<string> GetWard(string wardCode)
+    {
+        var client = new RestClient($"https://provinces.open-api.vn/api/w/{wardCode}");
+        var request = new RestRequest("", Method.Get);
+        var response = await client.ExecuteAsync(request);
+        var result = JsonSerializer.Deserialize<Ward>(response.Content!);
+        return result!.Name!;
     }
 
     // private async Task<bool> CreateResidenceInformation(MySqlConnection connection, int IdUsers, ResidenceInformationRequestDto residenceInformation)

@@ -1,6 +1,7 @@
 using System.Data;
 using System.Data.Common;
 using System.Security.Claims;
+using System.Text.Json;
 using FluentEmail.Core;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -8,6 +9,7 @@ using MySql.Data.MySqlClient;
 using Residence.DTOs;
 using Residence.Entities;
 using Residence.Services;
+using RestSharp;
 
 namespace Residence.Controllers;
 
@@ -116,11 +118,11 @@ public class TempResidenceDeleteController : BaseApiController
         await connection.OpenAsync();
         if (connection.State == ConnectionState.Open)
         {
-            var response = new PaginationResponseDto<TempResidenceRegisterResponseDto>();
+            var response = new PaginationResponseDto<TempResidenceRegisterDeleteResponseDto>();
             var count = await CountListTempResidenceRegisterDelete(connection);
             if (count == null || count == 0)
             {
-                response.Data = new List<TempResidenceRegisterResponseDto>();
+                response.Data = new List<TempResidenceRegisterDeleteResponseDto>();
                 response.Total = 0;
                 await connection.CloseAsync();
                 return Ok(response);
@@ -186,7 +188,7 @@ public class TempResidenceDeleteController : BaseApiController
 
     
 
-    private async Task<List<TempResidenceRegisterResponseDto>?> GetListTempResidenceRegisterDelete(MySqlConnection connection, PaginationRequestDto request)
+    private async Task<List<TempResidenceRegisterDeleteResponseDto>?> GetListTempResidenceRegisterDelete(MySqlConnection connection, PaginationRequestDto request)
     {
         using var command = new MySqlCommand();
         command.Connection = connection;
@@ -196,7 +198,8 @@ public class TempResidenceDeleteController : BaseApiController
         command.CommandText = queryString;
         command.Parameters.AddWithValue("@Limit", request.PageSize);
         command.Parameters.AddWithValue("@Offset", request.PageSize * (request.PageNumber - 1));
-        var response = new List<TempResidenceRegisterResponseDto>();
+        var provinces = await GetProvinces();
+        var response = new List<TempResidenceRegisterDeleteResponseDto>();
         try
         {
             using (DbDataReader reader = await command.ExecuteReaderAsync())
@@ -205,14 +208,15 @@ public class TempResidenceDeleteController : BaseApiController
                 {
                     while (reader.Read())
                     {
-                        var table = new TempResidenceRegisterResponseDto
+                        var table = new TempResidenceRegisterDeleteResponseDto
                         {
+                            IdHoSoXoaGiaHan = reader.GetInt32("IdHoSoXoaGiaHan"),
                             IdHoSoDkiTamtru= reader.GetInt32("IdHoSoDangKyTamTru"),
                             IdUsers = reader.GetInt32("IdUsers"),
                             ThuTuc = reader.GetString("ThuTuc"),
-                            ThanhPho = reader.GetString("ThanhPho"),
-                            Quan = reader.GetString("Quan"),
-                            Phuong = reader.GetString("Phuong"),
+                            ThanhPho = provinces.FirstOrDefault(province => province.Code!.ToString() == reader.GetString("ThanhPho"))!.Name,
+                            Quan = await GetDistrict(reader.GetString("Quan")),
+                            Phuong = await GetWard(reader.GetString("Phuong")),
                             DiaChi = reader.GetString("DiaChi"),
                             HoTenChuHo = reader.GetString("HoTenChuHo"),
                             QuanHeVoiChuHo = reader.GetString("QuanHeVoiChuHo"),
@@ -341,7 +345,7 @@ public class TempResidenceDeleteController : BaseApiController
         string queryString = @"UPDATE xoadkitamtru SET TrangThai=@TrangThai WHERE IdHoSoXoaGiaHan=@Id;";
 
         command.CommandText = queryString;
-        command.Parameters.AddWithValue("@TrangThai", "Approved");
+        command.Parameters.AddWithValue("@TrangThai", "Confirm");
         command.Parameters.AddWithValue("@Id", id);
 
         try
@@ -464,6 +468,33 @@ public class TempResidenceDeleteController : BaseApiController
             Console.WriteLine(e);
             return false;
         }
+    }
+
+    private async Task<List<Province>> GetProvinces()
+    {
+        var client = new RestClient("https://provinces.open-api.vn/api/p/");
+        var request = new RestRequest("", Method.Get);
+        var response = await client.ExecuteAsync(request);
+        var result = JsonSerializer.Deserialize<List<Province>>(response.Content!);
+        return result!;
+    }
+
+    private async Task<string> GetDistrict(string districtCode)
+    {
+        var client = new RestClient($"https://provinces.open-api.vn/api/d/{districtCode}");
+        var request = new RestRequest("", Method.Get);
+        var response = await client.ExecuteAsync(request);
+        var result = JsonSerializer.Deserialize<District>(response.Content!);
+        return result!.Name!;
+    }
+
+    private async Task<string> GetWard(string wardCode)
+    {
+        var client = new RestClient($"https://provinces.open-api.vn/api/w/{wardCode}");
+        var request = new RestRequest("", Method.Get);
+        var response = await client.ExecuteAsync(request);
+        var result = JsonSerializer.Deserialize<Ward>(response.Content!);
+        return result!.Name!;
     }
 
 

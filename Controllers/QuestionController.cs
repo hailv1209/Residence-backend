@@ -198,7 +198,6 @@ public async Task<ActionResult<List<QuestionAnswerDto>>> GetQuestionnaire()
         cautraloi.IdTraLoi, cautraloi.CauTraLoi, cautraloi.UpdatedAt as CauTraLoiUpdatedAt 
         FROM cauhoi 
         LEFT JOIN cautraloi ON cauhoi.IdCauHoi = cautraloi.IdCauHoi 
-        WHERE IdUsers = @IdUsers
         ORDER BY cauhoi.IdCauHoi ASC ;";
 
         command.CommandText = queryString;
