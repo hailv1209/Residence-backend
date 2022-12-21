@@ -22,7 +22,7 @@ public class ResidenceInformationRequestDto
     public string? Phone { get; set; }
     [Required]
     public string? Address { get; set; }
-    [Required]
-    public int IDToKhai { get; set; }
-    public string? TrangThai { get; set; }
+    // [Required]
+    // public int IDToKhai { get; set; }
+    // public string? TrangThai { get; set; }
 }

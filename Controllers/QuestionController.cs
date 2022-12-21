@@ -123,8 +123,8 @@ public async Task<ActionResult<List<QuestionAnswerDto>>> GetQuestionnaire()
         command.CommandText = queryString;
         command.Parameters.AddWithValue("@CauHoi", questionRequest.CauHoi);
         command.Parameters.AddWithValue("@IdUsers", IdUsers);
-        command.Parameters.AddWithValue("@CreatedAt", DateTime.UtcNow);
-        command.Parameters.AddWithValue("@UpdatedAt", DateTime.UtcNow);
+        command.Parameters.AddWithValue("@CreatedAt", DateTime.Now);
+        command.Parameters.AddWithValue("@UpdatedAt", DateTime.Now);
 
         try
         {
@@ -194,7 +194,12 @@ public async Task<ActionResult<List<QuestionAnswerDto>>> GetQuestionnaire()
         using var command = new MySqlCommand();
         command.Connection = connection;
 
-        string queryString = @"SELECT cauhoi.IdCauHoi, cauhoi.CauHoi, cauhoi.UpdatedAt as CauHoiUpdatedAt, cautraloi.IdTraLoi, cautraloi.CauTraLoi, cautraloi.UpdatedAt as CauTraLoiUpdatedAt FROM cauhoi LEFT JOIN cautraloi ON cauhoi.IdCauHoi = cautraloi.IdCauHoi WHERE IdUsers = @IdUsers;";
+        string queryString = @"SELECT cauhoi.IdCauHoi, cauhoi.CauHoi, cauhoi.UpdatedAt as CauHoiUpdatedAt, 
+        cautraloi.IdTraLoi, cautraloi.CauTraLoi, cautraloi.UpdatedAt as CauTraLoiUpdatedAt 
+        FROM cauhoi 
+        LEFT JOIN cautraloi ON cauhoi.IdCauHoi = cautraloi.IdCauHoi 
+        WHERE IdUsers = @IdUsers
+        ORDER BY cauhoi.IdCauHoi ASC ;";
 
         command.CommandText = queryString;
         command.Parameters.AddWithValue("@IdUsers", IdUsers);
@@ -213,8 +218,8 @@ public async Task<ActionResult<List<QuestionAnswerDto>>> GetQuestionnaire()
                             IdTraLoi = reader["IdTraLoi"] != DBNull.Value ? reader.GetInt32("IdTraLoi") : null,
                             CauHoi = reader.GetString("CauHoi"),
                             CauTraLoi = reader["CauTraLoi"] != DBNull.Value ? reader.GetString("CauTraLoi") : null,
-                            CauHoiUpdatedAt = (DateTime)reader["CauHoiUpdatedAt"],
-                            CauTraLoiUpdatedAt = reader["CauTraLoiUpdatedAt"] != DBNull.Value ? (DateTime)reader["CauTraLoiUpdatedAt"] : null,
+                            CauHoiUpdatedAt = reader.GetDateTime("CauHoiUpdatedAt"),
+                            CauTraLoiUpdatedAt = reader["CauTraLoiUpdatedAt"] != DBNull.Value ? reader.GetDateTime("CauTraLoiUpdatedAt") : null,
                         };
                         list.Add(questionAnswer);
                     }
@@ -236,7 +241,14 @@ public async Task<ActionResult<List<QuestionAnswerDto>>> GetQuestionnaire()
         using var command = new MySqlCommand();
         command.Connection = connection;
 
-        string queryString = @"SELECT cauhoi.IdCauHoi, cauhoi.CauHoi, cauhoi.UpdatedAt as CauHoiUpdatedAt, cautraloi.IdTraLoi, cautraloi.CauTraLoi, cautraloi.UpdatedAt as CauTraLoiUpdatedAt FROM cauhoi LEFT JOIN cautraloi ON cauhoi.IdCauHoi = cautraloi.IdCauHoi ORDER BY cauhoi.IdCauHoi DESC LIMIT @Limit OFFSET @Offset;";
+        string queryString = @"SELECT cauhoi.IdCauHoi, cauhoi.CauHoi, cauhoi.UpdatedAt as CauHoiUpdatedAt, 
+                                        cautraloi.IdTraLoi, cautraloi.CauTraLoi, cautraloi.UpdatedAt as CauTraLoiUpdatedAt, 
+                                        users.Fullname as AskedBy 
+                                FROM cauhoi 
+                                LEFT JOIN cautraloi ON cauhoi.IdCauHoi = cautraloi.IdCauHoi 
+                                INNER JOIN users ON cauhoi.IdUsers = users.IdUsers 
+                                ORDER BY cauhoi.IdCauHoi DESC 
+                                LIMIT @Limit OFFSET @Offset;";
 
         command.CommandText = queryString;
         command.Parameters.AddWithValue("@Limit", request.PageSize);
@@ -254,10 +266,11 @@ public async Task<ActionResult<List<QuestionAnswerDto>>> GetQuestionnaire()
                         {
                             IdCauHoi = reader.GetInt32("IdCauHoi"),
                             IdTraLoi = reader["IdTraLoi"] != DBNull.Value ? reader.GetInt32("IdTraLoi") : null,
+                            AskedBy = reader.GetString("AskedBy"),
                             CauHoi = reader.GetString("CauHoi"),
                             CauTraLoi = reader["CauTraLoi"] != DBNull.Value ? reader.GetString("CauTraLoi") : null,
-                            CauHoiUpdatedAt = (DateTime)reader["CauHoiUpdatedAt"],
-                            CauTraLoiUpdatedAt = reader["CauTraLoiUpdatedAt"] != DBNull.Value ? (DateTime)reader["CauTraLoiUpdatedAt"] : null,
+                            CauHoiUpdatedAt = reader.GetDateTime("CauHoiUpdatedAt"),
+                            CauTraLoiUpdatedAt = reader["CauTraLoiUpdatedAt"] != DBNull.Value ? reader.GetDateTime("CauTraLoiUpdatedAt") : null,
                         };
                         list.Add(questionAnswer);
                     }
