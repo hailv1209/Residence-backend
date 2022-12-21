@@ -53,8 +53,8 @@ public class AnswerController : BaseApiController
         command.CommandText = queryString;
         command.Parameters.AddWithValue("@CauTraLoi", answerRequest.CauTraLoi);
         command.Parameters.AddWithValue("@IdCauHoi", answerRequest.IdCauHoi);
-        command.Parameters.AddWithValue("@CreatedAt", DateTime.UtcNow);
-        command.Parameters.AddWithValue("@UpdatedAt", DateTime.UtcNow);
+        command.Parameters.AddWithValue("@CreatedAt", DateTime.Now);
+        command.Parameters.AddWithValue("@UpdatedAt", DateTime.Now);
 
         try
         {
