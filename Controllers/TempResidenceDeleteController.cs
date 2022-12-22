@@ -37,7 +37,7 @@ public class TempResidenceDeleteController : BaseApiController
         if (connection.State == ConnectionState.Open)
         {
             var tempResidenceRegister = await GetTempResidenceRegister(connection, request.IdHoSoDangKiTamTru);
-            if (tempResidenceRegister == null)
+            if (tempResidenceRegister == null || tempResidenceRegister.TrangThai == "Confirm")
             {
                 await connection.CloseAsync();
                 return BadRequest();
@@ -274,6 +274,7 @@ public class TempResidenceDeleteController : BaseApiController
                             NoiDung = reader.GetString("NoiDung"),
                             TamTruTuNgay = reader.GetDateTime("TamTruTuNgay"),
                             TamTruDenNgay = reader.GetDateTime("TamTruDenNgay"),
+                            TrangThai = reader.GetString("TrangThai")
                         };
                         return table;
                     }
