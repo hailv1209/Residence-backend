@@ -17,14 +17,14 @@ public class TempResidenceController : BaseApiController
 {
     private readonly ILogger<TempResidenceController> _logger;
     private readonly IConfiguration _configuration;
-    private readonly EmailService<dynamic> _email;
+    private readonly EmailService<User> _email;
     private List<Province>? provinces;
 
     public TempResidenceController(ILogger<TempResidenceController> logger, IConfiguration configuration, IFluentEmail email)
     {
         _configuration = configuration;
         _logger = logger;
-        _email = new EmailService<dynamic>(email);
+        _email = new EmailService<User>(email);
         provinces = null;
     }
     [Authorize(Roles = "User")]
@@ -185,11 +185,31 @@ public class TempResidenceController : BaseApiController
         await connection.OpenAsync();
         if (connection.State == ConnectionState.Open)
         {
+            var tempResidenceRegisterFromDB = await GetTempResidenceRegister(connection, tempResidenceRegister.IdHoSoDkiTamtru);
+
+            if (tempResidenceRegisterFromDB == null)
+            {
+                await connection.CloseAsync();
+                return NotFound("Register not found");
+            }
+
+            var userFromDB = await GetUserById(connection, tempResidenceRegisterFromDB.IdUsers);
+
+            if (userFromDB == null)
+            {
+                await connection.CloseAsync();
+                return NotFound("User not found");
+            }
+
             var result = await UpdateTempResidenceRegisterStatus(connection, tempResidenceRegister);
             if (result)
             {
-                var emailTemplate = new EmailDto<dynamic>{};
-                await _email.SendEmail(emailTemplate);
+                var emailTemplate = new EmailDto<User>{
+                    To = userFromDB.Email,
+                    Subject = "Xác nhận đăng kí tạm trú",
+                    Template = "Residence.Services.EmailTemplate.cshtml"
+                };
+                await _email.SendEmailWithEmbeddedTemplate(emailTemplate);
                 await connection.CloseAsync();
                 return Ok(true);
             }
@@ -241,6 +261,51 @@ public class TempResidenceController : BaseApiController
 
         command.CommandText = queryString;
         command.Parameters.AddWithValue("@username", username);
+        try
+        {
+            using (DbDataReader reader = await command.ExecuteReaderAsync())
+            {
+                if (reader.HasRows)
+                {
+                    while (reader.Read())
+                    {
+                        var user = new User
+                        {
+                            IdUsers = reader.GetInt32("IdUsers"),
+                            Gender = reader.GetString("Gender"),
+                            Fullname = reader.GetString("Fullname"),
+                            Birthday = (DateTime)reader["Birthday"],
+                            City = reader.GetString("City"),
+                            District = reader.GetString("District"),
+                            Ward = reader.GetString("Ward"),
+                            Email = reader.GetString("Email"),
+                            Phone = reader.GetString("Phone"),
+                            Address = reader.GetString("Address"),
+                        };
+                        return user;
+                    }
+                    return null;
+                }
+                return null;
+            }
+
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+            return null;
+        }
+    }
+
+    private async Task<User?> GetUserById(MySqlConnection connection, int id)
+    {
+        using var command = new MySqlCommand();
+        command.Connection = connection;
+
+        string queryString = @"SELECT * FROM users WHERE IdUsers = @IdUsers;";
+
+        command.CommandText = queryString;
+        command.Parameters.AddWithValue("@IdUsers", id);
         try
         {
             using (DbDataReader reader = await command.ExecuteReaderAsync())
